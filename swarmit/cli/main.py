@@ -568,9 +568,34 @@ def message(ctx, message):
 @click.pass_context
 def calibrate_lh2(ctx, lh2_calibration_file):
     """Send LH2 calibration data to the robots."""
+    console = Console()
     settings = ctx.obj["settings"]
+    blob = lh2_calibration_file.read()
+    if not blob:
+        console.print("[bold red]Error:[/] Calibration file is empty.")
+        raise click.Abort()
+
+    # Format: 1-byte count + N×36B matrices. Read the count client-side so
+    # there is visible output in daemon mode too — over HTTP the controller's
+    # own progress prints run in the server process, not this terminal.
+    homography_count = blob[0]
+    console.print(
+        f"Sending [bold cyan]{homography_count}[/] calibration "
+        f"matrix/matrices ([bold]{len(blob)}B[/]) to the swarm..."
+    )
     with build_client(settings, no_server=ctx.obj["no_server"]) as client:
-        client.send_lh2_calibration(lh2_calibration_file.read())
+        try:
+            with console.status(
+                "[bold green]Sending calibration...",
+                spinner="dots",
+            ):
+                client.send_lh2_calibration(blob)
+        except (ValueError, RuntimeError) as exc:
+            # ValueError: local Controller validation. RuntimeError: daemon
+            # returned 400 (same validation, surfaced over HTTP).
+            console.print(f"[bold red]Error:[/] {exc}")
+            raise click.Abort()
+    console.print("[bold green]✓[/] Calibration sent.")
 
 
 @main.command()
