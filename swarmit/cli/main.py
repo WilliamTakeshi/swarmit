@@ -24,7 +24,10 @@ from swarmit.testbed.controller import (
     ResetLocation,
     generate_status,
 )
-from swarmit.testbed.helpers import load_toml_config
+from swarmit.testbed.helpers import (
+    load_toml_config,
+    read_lh2_calibration_payload,
+)
 from swarmit.testbed.logger import setup_logging
 from swarmit.testbed.protocol import StatusType
 
@@ -563,14 +566,25 @@ def message(ctx, message):
 
 @main.command()
 @click.argument(
-    "lh2-calibration-file", type=click.File(mode="rb"), required=True
+    "lh2-calibration-file",
+    type=click.Path(exists=True, dir_okay=False),
+    required=True,
 )
 @click.pass_context
 def calibrate_lh2(ctx, lh2_calibration_file):
-    """Send LH2 calibration data to the robots."""
+    """Send LH2 calibration data to the robots.
+
+    Accepts either the legacy raw payload (e.g. calibration.out) or a
+    calibration-*.toml written by `dotbot calibrate-lh2`; the format is
+    picked by file extension.
+    """
     console = Console()
     settings = ctx.obj["settings"]
-    blob = lh2_calibration_file.read()
+    try:
+        blob = read_lh2_calibration_payload(lh2_calibration_file)
+    except ValueError as exc:
+        console.print(f"[bold red]Error:[/] {exc}")
+        raise click.Abort()
     if not blob:
         console.print("[bold red]Error:[/] Calibration file is empty.")
         raise click.Abort()
