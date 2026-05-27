@@ -12,6 +12,7 @@ from dotbot_utils.protocol import (
 from marilib.communication_adapter import MQTTAdapter as MarilibMQTTAdapter
 from marilib.communication_adapter import SerialAdapter as MarilibSerialAdapter
 from marilib.mari_protocol import Frame as MariFrame
+from marilib.mari_protocol import NextProto
 from marilib.marilib_cloud import MarilibCloud
 from marilib.marilib_edge import MarilibEdge
 from marilib.model import EdgeEvent, MariNode
@@ -45,6 +46,8 @@ class MarilibEdgeAdapter(GatewayAdapterBase):
             if self.verbose:
                 print("[orange]Node left:[/]", event_data)
         elif event == EdgeEvent.NODE_DATA:
+            if event_data.header.next_proto != NextProto.SWARMIT_TESTBED:
+                return
             try:
                 packet = Packet.from_bytes(event_data.payload)
             except (ValueError, ProtocolPayloadParserException) as exc:
@@ -95,6 +98,7 @@ class MarilibEdgeAdapter(GatewayAdapterBase):
         self.mari.send_frame(
             dst=destination,
             payload=Packet.from_payload(payload).to_bytes(),
+            next_proto=NextProto.SWARMIT_TESTBED,
         )
 
 
@@ -109,6 +113,8 @@ class MarilibCloudAdapter(GatewayAdapterBase):
             if self.verbose:
                 print("[orange]Node left:[/]", event_data)
         elif event == EdgeEvent.NODE_DATA:
+            if event_data.header.next_proto != NextProto.SWARMIT_TESTBED:
+                return
             try:
                 packet = Packet.from_bytes(event_data.payload)
             except (ValueError, ProtocolPayloadParserException) as exc:
@@ -161,4 +167,5 @@ class MarilibCloudAdapter(GatewayAdapterBase):
         self.mari.send_frame(
             dst=destination,
             payload=Packet.from_payload(payload).to_bytes(),
+            next_proto=NextProto.SWARMIT_TESTBED,
         )

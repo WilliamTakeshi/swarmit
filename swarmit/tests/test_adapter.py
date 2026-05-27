@@ -3,6 +3,7 @@ from unittest.mock import patch
 from dotbot_utils.protocol import Packet
 from marilib.mari_protocol import Frame as MariFrame
 from marilib.mari_protocol import Header as MariHeader
+from marilib.mari_protocol import NextProto
 from marilib.model import EdgeEvent
 
 from swarmit.testbed.adapter import MarilibCloudAdapter, MarilibEdgeAdapter
@@ -22,7 +23,10 @@ def test_marilib_edge_adapter(send_frame_mock, _, capsys):
 
     payload = PayloadStatus(device=1, status=2)
     packet = Packet().from_payload(payload)
-    mari_frame = MariFrame(header=MariHeader(), payload=packet.to_bytes())
+    mari_frame = MariFrame(
+        header=MariHeader(next_proto=NextProto.SWARMIT_TESTBED),
+        payload=packet.to_bytes(),
+    )
 
     # should ignore if not initialized
     adapter.on_event(EdgeEvent.NODE_DATA, mari_frame)
@@ -36,6 +40,14 @@ def test_marilib_edge_adapter(send_frame_mock, _, capsys):
 
     assert packets == [packet]
 
+    # a frame for another namespace is dropped by the strict next_proto gate
+    other_frame = MariFrame(
+        header=MariHeader(next_proto=NextProto.DOTBOT_APP),
+        payload=packet.to_bytes(),
+    )
+    adapter.on_event(EdgeEvent.NODE_DATA, other_frame)
+    assert packets == [packet]
+
     adapter.on_event(EdgeEvent.NODE_JOINED, None)
     out, _ = capsys.readouterr()
     assert "Node joined" in out
@@ -45,14 +57,19 @@ def test_marilib_edge_adapter(send_frame_mock, _, capsys):
     assert "Node left" in out
 
     # invalid frame
-    mari_frame = MariFrame(header=MariHeader(), payload=b"`\x01invalid")
+    mari_frame = MariFrame(
+        header=MariHeader(next_proto=NextProto.SWARMIT_TESTBED),
+        payload=b"`\x01invalid",
+    )
     adapter.on_event(EdgeEvent.NODE_DATA, mari_frame)
     out, _ = capsys.readouterr()
     assert "Error parsing packet" in out
 
     adapter.send_payload(mari_frame.header.destination, payload)
     send_frame_mock.assert_called_once_with(
-        dst=mari_frame.header.destination, payload=packet.to_bytes()
+        dst=mari_frame.header.destination,
+        payload=packet.to_bytes(),
+        next_proto=NextProto.SWARMIT_TESTBED,
     )
     adapter.close()
 
@@ -89,7 +106,10 @@ def test_marilib_cloud_adapter(send_frame_mock, _, capsys):
 
     payload = PayloadStatus(device=1, status=2)
     packet = Packet().from_payload(payload)
-    mari_frame = MariFrame(header=MariHeader(), payload=packet.to_bytes())
+    mari_frame = MariFrame(
+        header=MariHeader(next_proto=NextProto.SWARMIT_TESTBED),
+        payload=packet.to_bytes(),
+    )
 
     # should ignore if not initialized
     adapter.on_event(EdgeEvent.NODE_DATA, mari_frame)
@@ -103,6 +123,14 @@ def test_marilib_cloud_adapter(send_frame_mock, _, capsys):
 
     assert packets == [packet]
 
+    # a frame for another namespace is dropped by the strict next_proto gate
+    other_frame = MariFrame(
+        header=MariHeader(next_proto=NextProto.DOTBOT_APP),
+        payload=packet.to_bytes(),
+    )
+    adapter.on_event(EdgeEvent.NODE_DATA, other_frame)
+    assert packets == [packet]
+
     adapter.on_event(EdgeEvent.NODE_JOINED, None)
     out, _ = capsys.readouterr()
     assert "Node joined" in out
@@ -112,14 +140,19 @@ def test_marilib_cloud_adapter(send_frame_mock, _, capsys):
     assert "Node left" in out
 
     # invalid frame
-    mari_frame = MariFrame(header=MariHeader(), payload=b"`\x01invalid")
+    mari_frame = MariFrame(
+        header=MariHeader(next_proto=NextProto.SWARMIT_TESTBED),
+        payload=b"`\x01invalid",
+    )
     adapter.on_event(EdgeEvent.NODE_DATA, mari_frame)
     out, _ = capsys.readouterr()
     assert "Error parsing packet" in out
 
     adapter.send_payload(mari_frame.header.destination, payload)
     send_frame_mock.assert_called_once_with(
-        dst=mari_frame.header.destination, payload=packet.to_bytes()
+        dst=mari_frame.header.destination,
+        payload=packet.to_bytes(),
+        next_proto=NextProto.SWARMIT_TESTBED,
     )
     adapter.close()
 
