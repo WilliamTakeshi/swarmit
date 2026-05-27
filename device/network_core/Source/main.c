@@ -78,6 +78,15 @@ volatile __attribute__((section(".shared_data"))) ipc_shared_data_t ipc_shared_d
 static const mr_gpio_t _debug1 = { .port = 1, .pin = 8 };
 //static const mr_gpio_t _debug2 = { .port = 1, .pin = 10 };
 
+// Mari TX configs. MARI_TX_INTERNAL is exported from models.h for mari's
+// own metrics-probe sends.
+static const mari_tx_config_t SWARMIT_TX_DEFAULT = {
+    .next_proto = MARI_NEXT_PROTO_SWARMIT_TESTBED,
+};
+static const mari_tx_config_t SWARMIT_TX_DOTBOT_FORWARD = {
+    .next_proto = MARI_NEXT_PROTO_DOTBOT_APP,
+};
+
 //=========================== functions =========================================
 
 static void _handle_packet(uint64_t dst_address, uint8_t *packet, uint8_t length) {
@@ -256,7 +265,7 @@ int main(void) {
             length += sizeof(uint16_t);
             memcpy(&_app_vars.notification_buffer[length], (void *)&ipc_shared_data.current_position, sizeof(position_2d_t));
             length += sizeof(position_2d_t);
-            mari_node_tx_payload(_app_vars.notification_buffer, length);
+            mari_node_tx_payload(_app_vars.notification_buffer, length, &SWARMIT_TX_DEFAULT);
         }
 
         if (_app_vars.req_received) {
@@ -408,7 +417,7 @@ int main(void) {
                     break;
                 case IPC_MARI_NODE_TX_REQ:
                     while (!mari_node_is_connected()) {}
-                    mari_node_tx_payload((uint8_t *)ipc_shared_data.tx_pdu.buffer, ipc_shared_data.tx_pdu.length);
+                    mari_node_tx_payload((uint8_t *)ipc_shared_data.tx_pdu.buffer, ipc_shared_data.tx_pdu.length, &SWARMIT_TX_DOTBOT_FORWARD);
                     break;
                 case IPC_RNG_INIT_REQ:
                     db_rng_init();
@@ -439,7 +448,7 @@ int main(void) {
             metrics_payload->rssi_at_node         = mr_radio_rssi();
 
             // send metrics probe to gateway
-            mari_node_tx_payload((uint8_t *)metrics_payload, sizeof(mr_metrics_payload_t));
+            mari_node_tx_payload((uint8_t *)metrics_payload, sizeof(mr_metrics_payload_t), &MARI_TX_INTERNAL);
         }
 
         if (_app_vars.ipc_log_received) {
@@ -454,7 +463,7 @@ int main(void) {
             memcpy(_app_vars.notification_buffer + length, (void *)&ipc_shared_data.log, ipc_shared_data.log.length + 1);
             mutex_unlock();
             length += ipc_shared_data.log.length + 1;
-            mari_node_tx_payload(_app_vars.notification_buffer, length);
+            mari_node_tx_payload(_app_vars.notification_buffer, length, &SWARMIT_TX_DEFAULT);
         }
     }
 }
