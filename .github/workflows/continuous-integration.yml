@@ -53,6 +53,29 @@ jobs:
           name: artifacts-netcore
           path: device/network_core/Output/nrf5340-net/${{ matrix.config }}/Exe/netcore-nrf5340-net.*
 
+  build-mari-gateway:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ["Debug", "Release"]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+      - name: Build mari gateway (app + net) for nrf5340dk
+        working-directory: mari/firmware
+        run: BUILD_CONFIG=${{ matrix.config }} DOCKER_TARGETS="gateway-app gateway-net" make docker
+      - name: Upload artifact
+        if: matrix.config == 'Debug'
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-mari-gateway
+          path: |
+            mari/firmware/app/03app_gateway_app/Output/nrf5340-app/${{ matrix.config }}/Exe/03app_gateway_app-nrf5340-app.*
+            mari/firmware/app/03app_gateway_net/Output/nrf5340-net/${{ matrix.config }}/Exe/03app_gateway_net-nrf5340-net.*
+
   swarmit-check:
     name: swarmit-check (${{ matrix.os }}, python-${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -106,6 +129,7 @@ jobs:
     needs:
       - build-netcore
       - build-bootloader-and-sample
+      - build-mari-gateway
       - swarmit-check
     if: >-
       github.event_name == 'push' &&
@@ -147,6 +171,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: artifacts-netcore
+          path: ./artifacts
+      - name: Download mari gateway artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-mari-gateway
           path: ./artifacts
       - name: Release
         uses: ncipollo/release-action@v1
