@@ -47,13 +47,16 @@ def test_main_help():
     for expected in (
         "Usage: main [OPTIONS] COMMAND [ARGS]...",
         "-c, --config-path",
-        "-n, --network-id",
-        "-a, --adapter",
+        "-n, --conn",
+        "-s, --swarm-id",
         "-d, --devices",
         "-v, --verbose",
         "--no-server",
     ):
         assert expected in result.output, expected
+    # Dropped flags must be gone.
+    for gone in ("--adapter", "--mqtt-host", "--network-id"):
+        assert gone not in result.output, gone
     for cmd in (
         "calibrate-lh2",
         "flash",
@@ -365,8 +368,7 @@ def test_status_watch(build_client_mock):
 
 
 TEST_CONFIG_TOML = """
-adapter = "edge"
-serial_port = "/dev/ttyACM0"
+conn = "/dev/ttyACM0"
 baudrate = 1000000
 devices = ""
 """
