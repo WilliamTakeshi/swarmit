@@ -203,7 +203,9 @@ def _conn_to_config(conn, swarm_id):
         # from DOTBOT_MQTT_USER / DOTBOT_MQTT_PASS in the environment.
         host, port, use_tls, _user, _pass = parse_mqtt_url(conn)
         if not host:
-            raise click.ClickException(f"no host in connection string: {conn!r}")
+            raise click.ClickException(
+                f"no host in connection string: {conn!r}"
+            )
         if not swarm_id:
             raise click.ClickException(
                 f"--conn {conn} needs --swarm-id: the broker carries multiple "
@@ -301,7 +303,9 @@ def main(
 
     # `conn` / `swarm_id` may come from the CLI or the config file (CLI wins).
     conn = conn if conn is not None else config_data.get("conn")
-    swarm_id = swarm_id if swarm_id is not None else config_data.get("swarm_id")
+    swarm_id = (
+        swarm_id if swarm_id is not None else config_data.get("swarm_id")
+    )
     conn_config = _conn_to_config(conn, swarm_id)
 
     cli_args = {
