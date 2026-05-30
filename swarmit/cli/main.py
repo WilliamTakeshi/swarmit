@@ -195,21 +195,24 @@ def _conn_to_config(conn, swarm_id):
             "(/dev/ttyACM0) or a broker (mqtts://host:port)."
         )
     if lowered.startswith(("mqtt://", "mqtts://")):
-        from urllib.parse import urlparse
+        from marilib.communication_adapter import parse_mqtt_url
 
-        parsed = urlparse(conn)
-        if not parsed.hostname:
+        # marilib owns the URL→parts mapping (host/port/tls + default
+        # port) so swarmit, dotbot controller, and MQTTAdapter.from_url
+        # can't drift. Userinfo creds are discarded — broker auth comes
+        # from DOTBOT_MQTT_USER / DOTBOT_MQTT_PASS in the environment.
+        host, port, use_tls, _user, _pass = parse_mqtt_url(conn)
+        if not host:
             raise click.ClickException(f"no host in connection string: {conn!r}")
         if not swarm_id:
             raise click.ClickException(
                 f"--conn {conn} needs --swarm-id: the broker carries multiple "
                 "swarms; --swarm-id selects yours."
             )
-        use_tls = parsed.scheme == "mqtts"
         cfg = {
             "adapter": "cloud",
-            "mqtt_host": parsed.hostname,
-            "mqtt_port": parsed.port or (8883 if use_tls else 1883),
+            "mqtt_host": host,
+            "mqtt_port": port,
             "mqtt_use_tls": use_tls,
             "mqtt_username": os.environ.get("DOTBOT_MQTT_USER"),
             "mqtt_password": os.environ.get("DOTBOT_MQTT_PASS"),
