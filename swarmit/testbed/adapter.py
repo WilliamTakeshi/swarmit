@@ -133,8 +133,8 @@ class MarilibCloudAdapter(GatewayAdapterBase):
         network_id: int,
         verbose: bool = False,
         busy_wait_timeout: float = 3,
-        username: str = None,
-        password: str = None,
+        username: str | None = None,
+        password: str | None = None,
     ):
         self.verbose = verbose
         self.busy_wait_timeout = busy_wait_timeout

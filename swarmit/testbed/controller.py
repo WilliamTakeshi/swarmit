@@ -217,8 +217,8 @@ class ControllerSettings:
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
     mqtt_use_tls: bool = False
-    mqtt_username: str = None
-    mqtt_password: str = None
+    mqtt_username: str | None = None
+    mqtt_password: str | None = None
     network_id: int = 1
     adapter: str = "serial"  # or "mqtt", "marilib-edge", "marilib-cloud"
     devices: list[str] = dataclasses.field(default_factory=lambda: [])
