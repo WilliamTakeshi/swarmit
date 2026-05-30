@@ -47,6 +47,11 @@ class MarilibEdgeAdapter(GatewayAdapterBase):
                 print("[orange]Node left:[/]", event_data)
         elif event == EdgeEvent.NODE_DATA:
             if event_data.header.next_proto != NextProto.SWARMIT_TESTBED:
+                if self.verbose:
+                    print(
+                        "[red]swarmit: dropping NODE_DATA frame with "
+                        f"unexpected next_proto {event_data.header.next_proto!r}[/]"
+                    )
                 return
             try:
                 packet = Packet.from_bytes(event_data.payload)
@@ -114,6 +119,11 @@ class MarilibCloudAdapter(GatewayAdapterBase):
                 print("[orange]Node left:[/]", event_data)
         elif event == EdgeEvent.NODE_DATA:
             if event_data.header.next_proto != NextProto.SWARMIT_TESTBED:
+                if self.verbose:
+                    print(
+                        "[red]swarmit: dropping NODE_DATA frame with "
+                        f"unexpected next_proto {event_data.header.next_proto!r}[/]"
+                    )
                 return
             try:
                 packet = Packet.from_bytes(event_data.payload)
