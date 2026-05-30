@@ -415,10 +415,16 @@ int main(void) {
                         _app_vars.mari_initialized = true;
                     }
                     break;
-                case IPC_MARI_NODE_TX_REQ:
+                case IPC_MARI_NODE_TX_REQ: {
                     while (!mari_node_is_connected()) {}
-                    mari_node_tx_payload((uint8_t *)ipc_shared_data.tx_pdu.buffer, ipc_shared_data.tx_pdu.length, &SWARMIT_TX_DOTBOT_FORWARD);
+                    // forward user-image data as DOTBOT_APP, but keep the bootloader's
+                    // messages when user image is not running
+                    bool user_running = (ipc_shared_data.status == SWRMT_APPLICATION_RUNNING ||
+                                         ipc_shared_data.status == SWRMT_APPLICATION_STOPPING);
+                    const mari_tx_config_t *tx_config = user_running ? &SWARMIT_TX_DOTBOT_FORWARD : &SWARMIT_TX_DEFAULT;
+                    mari_node_tx_payload((uint8_t *)ipc_shared_data.tx_pdu.buffer, ipc_shared_data.tx_pdu.length, tx_config);
                     break;
+                }
                 case IPC_RNG_INIT_REQ:
                     db_rng_init();
                     break;
