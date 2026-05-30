@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import threading
 import time
 
@@ -173,6 +174,61 @@ DEFAULTS = {
 }
 
 
+def _conn_to_config(conn, swarm_id):
+    """Translate `--conn` + `--swarm-id` into config overrides.
+
+    One discriminated connection string — `mqtts://host:port` (broker) or
+    a serial device path (gateway). swarmit has no simulator. The internal
+    `adapter` enum stays an implementation detail. Broker credentials come
+    from `DOTBOT_MQTT_USER` / `DOTBOT_MQTT_PASS` in the environment.
+
+    Returns a dict of config keys (only the ones the connection sets), or
+    `{}` if `conn` is None (fall through to defaults / config file).
+    Raises `click.ClickException` on a malformed conn / missing swarm-id.
+    """
+    if conn is None:
+        return {}
+    lowered = conn.strip().lower()
+    if lowered in ("simulator", "sim"):
+        raise click.ClickException(
+            "swarmit has no simulator connection; use a serial gateway "
+            "(/dev/ttyACM0) or a broker (mqtts://host:port)."
+        )
+    if lowered.startswith(("mqtt://", "mqtts://")):
+        from urllib.parse import urlparse
+
+        parsed = urlparse(conn)
+        if not parsed.hostname:
+            raise click.ClickException(f"no host in connection string: {conn!r}")
+        if not swarm_id:
+            raise click.ClickException(
+                f"--conn {conn} needs --swarm-id: the broker carries multiple "
+                "swarms; --swarm-id selects yours."
+            )
+        use_tls = parsed.scheme == "mqtts"
+        cfg = {
+            "adapter": "cloud",
+            "mqtt_host": parsed.hostname,
+            "mqtt_port": parsed.port or (8883 if use_tls else 1883),
+            "mqtt_use_tls": use_tls,
+            "mqtt_username": os.environ.get("DOTBOT_MQTT_USER"),
+            "mqtt_password": os.environ.get("DOTBOT_MQTT_PASS"),
+        }
+        if swarm_id:
+            cfg["swarmit_network_id"] = swarm_id
+        return cfg
+    if "://" in conn:
+        raise click.ClickException(
+            f"unrecognized connection scheme in {conn!r} "
+            "(expected mqtt(s):// or a device path)."
+        )
+    # serial device path
+    cfg = {"adapter": "edge", "serial_port": conn}
+    if swarm_id:
+        cfg["swarmit_network_id"] = swarm_id
+    return cfg
+
+
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
 @click.option(
     "-c",
@@ -181,46 +237,31 @@ DEFAULTS = {
     help="Path to a .toml configuration file.",
 )
 @click.option(
-    "-p",
-    "--port",
+    "-n",
+    "--conn",
+    "--connection",
+    "conn",
     type=str,
-    help=f"Serial port to use to send the bitstream to the gateway. Default: {DEFAULTS['serial_port']}.",
+    help=(
+        "Connection to the swarm — one discriminated string: an MQTT "
+        "broker `mqtts://host:port`, or a serial gateway `/dev/ttyACM0`."
+    ),
+)
+@click.option(
+    "-s",
+    "--swarm-id",
+    "swarm_id",
+    type=str,
+    help=(
+        "Swarm id in hex. Required for an mqtt connection (the broker "
+        "carries many swarms); ignored for a serial gateway."
+    ),
 )
 @click.option(
     "-b",
     "--baudrate",
     type=int,
     help=f"Serial port baudrate. Default: {DEFAULTS['baudrate']}.",
-)
-@click.option(
-    "-H",
-    "--mqtt-host",
-    type=str,
-    help=f"MQTT host. Default: {DEFAULTS['mqtt_host']}.",
-)
-@click.option(
-    "-P",
-    "--mqtt-port",
-    type=int,
-    help=f"MQTT port. Default: {DEFAULTS['mqtt_port']}.",
-)
-@click.option(
-    "-T",
-    "--mqtt-use_tls",
-    is_flag=True,
-    help="Use TLS with MQTT.",
-)
-@click.option(
-    "-n",
-    "--network-id",
-    type=str,
-    help=f"Marilib network ID to use. Default: 0x{DEFAULTS['swarmit_network_id']}",
-)
-@click.option(
-    "-a",
-    "--adapter",
-    type=click.Choice(["edge", "cloud"], case_sensitive=True),
-    help=f"Choose the adapter to communicate with the gateway. Default: {DEFAULTS['adapter']}",
 )
 @click.option(
     "-d",
@@ -246,34 +287,38 @@ DEFAULTS = {
 def main(
     ctx,
     config_path,
-    port,
+    conn,
+    swarm_id,
     baudrate,
-    mqtt_host,
-    mqtt_port,
-    mqtt_use_tls,
-    network_id,
-    adapter,
     devices,
     verbose,
     no_server,
 ):
     config_data = load_toml_config(config_path)
+
+    # `conn` / `swarm_id` may come from the CLI or the config file (CLI wins).
+    conn = conn if conn is not None else config_data.get("conn")
+    swarm_id = swarm_id if swarm_id is not None else config_data.get("swarm_id")
+    conn_config = _conn_to_config(conn, swarm_id)
+
     cli_args = {
-        "adapter": adapter,
-        "serial_port": port,
         "baudrate": baudrate,
-        "mqtt_host": mqtt_host,
-        "mqtt_port": mqtt_port,
-        "mqtt_use_tls": mqtt_use_tls,
-        "swarmit_network_id": network_id,
         "devices": devices,
         "verbose": verbose,
     }
 
-    # Merge in order of priority: CLI > config > defaults
+    # Merge in order of priority: CLI > conn translation > config > defaults.
+    # `conn` / `swarm_id` config-file keys are consumed by _conn_to_config,
+    # so drop them from the raw config merge.
+    raw_config = {
+        k: v
+        for k, v in config_data.items()
+        if k not in ("conn", "swarm_id") and v is not None
+    }
     final_config = {
         **DEFAULTS,
-        **{k: v for k, v in config_data.items() if v is not None},
+        **raw_config,
+        **conn_config,
         **{k: v for k, v in cli_args.items() if v not in (None, False)},
     }
 
@@ -286,6 +331,8 @@ def main(
         mqtt_host=final_config["mqtt_host"],
         mqtt_port=final_config["mqtt_port"],
         mqtt_use_tls=final_config["mqtt_use_tls"],
+        mqtt_username=final_config.get("mqtt_username"),
+        mqtt_password=final_config.get("mqtt_password"),
         network_id=int(final_config["swarmit_network_id"], 16),
         adapter=final_config["adapter"],
         devices=[d for d in final_config["devices"].split(",") if d],

@@ -133,13 +133,25 @@ class MarilibCloudAdapter(GatewayAdapterBase):
         network_id: int,
         verbose: bool = False,
         busy_wait_timeout: float = 3,
+        username: str = None,
+        password: str = None,
     ):
         self.verbose = verbose
         self.busy_wait_timeout = busy_wait_timeout
+        # Broker credentials (from DOTBOT_MQTT_USER / DOTBOT_MQTT_PASS) take
+        # effect once the marilib companion adds username/password to
+        # MQTTAdapter; until then anonymous connect (unchanged behaviour).
+        mqtt_kwargs = {}
+        if username is not None:
+            mqtt_kwargs["username"] = username
+        if password is not None:
+            mqtt_kwargs["password"] = password
         try:
             self.mari = MarilibCloud(
                 self.on_event,
-                MarilibMQTTAdapter(host, port, use_tls=use_tls, is_edge=False),
+                MarilibMQTTAdapter(
+                    host, port, use_tls=use_tls, is_edge=False, **mqtt_kwargs
+                ),
                 network_id,
             )
         except Exception as exc:
