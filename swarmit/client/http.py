@@ -206,6 +206,9 @@ class HTTPSwarmitClient:
         }
         self._request("POST", "/lh2_calibration", body=body)
 
+    def request_lh2_capture(self, device_addr: str) -> None:
+        self._request("POST", "/lh2_capture", body={"device": device_addr})
+
     def close(self) -> None:
         # No persistent connection to close (stdlib urllib opens per-request).
         pass
