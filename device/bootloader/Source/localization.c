@@ -18,6 +18,7 @@ typedef struct {
 
 static __attribute__((aligned(4))) localization_data_t _localization_data = { 0 };
 static bool _calibration_loaded = false;
+static bool _lh2_started = false;
 
 float _distance(position_2d_t *reference, position_2d_t *current) {
     float dx = ((float)current->x - (float)reference->x);
@@ -25,10 +26,18 @@ float _distance(position_2d_t *reference, position_2d_t *current) {
     return sqrtf(powf(dx, 2) + powf(dy, 2));
 }
 
-void localization_init(int32_t homographies[][3][3], uint32_t homography_count) {
-    printf("Initialize localization with %u homography matrices\n", homography_count);
+void localization_start(void) {
+    if (_lh2_started) {
+        return;
+    }
     db_lh2_init(&_localization_data.lh2, &db_lh2_d, &db_lh2_e);
     db_lh2_start();
+    _lh2_started = true;
+}
+
+void localization_init(int32_t homographies[][3][3], uint32_t homography_count) {
+    printf("Initialize localization with %u homography matrices\n", homography_count);
+    localization_start();
 
     for (uint8_t lh_index = 0; lh_index < homography_count; lh_index++) {
         printf("Store homography matrix for LH%u:\n", lh_index);
@@ -99,4 +108,21 @@ bool localization_get_position(position_2d_t *position) {
     }
 
     return false;
+}
+
+uint8_t localization_get_raw_counts(lh2_raw_sample_t *out, uint8_t max) {
+    uint8_t n = 0;
+    db_lh2_stop();
+    for (uint8_t lh_index = 0; lh_index < LH2_BASESTATION_COUNT && n < max; lh_index++) {
+        if (_localization_data.lh2.data_ready[0][lh_index] == DB_LH2_PROCESSED_DATA_AVAILABLE && _localization_data.lh2.data_ready[1][lh_index] == DB_LH2_PROCESSED_DATA_AVAILABLE) {
+            out[n].lh_index = lh_index;
+            out[n].count1   = _localization_data.lh2.locations[0][lh_index].lfsr_counts;
+            out[n].count2   = _localization_data.lh2.locations[1][lh_index].lfsr_counts;
+            _localization_data.lh2.data_ready[0][lh_index] = DB_LH2_NO_NEW_DATA;
+            _localization_data.lh2.data_ready[1][lh_index] = DB_LH2_NO_NEW_DATA;
+            n++;
+        }
+    }
+    db_lh2_start();
+    return n;
 }
