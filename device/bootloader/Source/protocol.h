@@ -26,6 +26,10 @@
 #define SWRMT_PREAMBLE_LENGTH       (8U)
 #define SWRMT_OTA_CHUNK_SIZE        (128U)
 
+/// First byte of a raw LH2 capture sample carried inside a LOG_EVENT payload.
+/// Lets the host tell a calibration sample apart from a regular text log line.
+#define SWRMT_LH2_CALIB_TAG         (0xCAU)
+
 typedef struct __attribute__((packed)) {
     uint32_t index;                             ///< Index of the chunk
     uint8_t  chunk_size;                        ///< Size of the chunk

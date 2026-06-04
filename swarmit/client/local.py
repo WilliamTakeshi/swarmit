@@ -166,6 +166,9 @@ class LocalSwarmitClient:
     def send_lh2_calibration(self, blob: bytes) -> None:
         self._controller.send_lh2_calibration(bytearray(blob))
 
+    def request_lh2_capture(self, device_addr: str) -> None:
+        self._controller.request_lh2_capture(device_addr)
+
     def watch_status(
         self, interval: float = 0.5
     ) -> Iterator[dict[str, NodeStatus]]:

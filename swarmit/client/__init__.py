@@ -70,6 +70,14 @@ class SwarmitClient(Protocol):
 
     def send_lh2_calibration(self, blob: bytes) -> None: ...
 
+    def request_lh2_capture(self, device_addr: str) -> None:
+        """Trigger a raw LH2 capture on one device (READY mode only).
+
+        The bot answers with a SWARMIT_EVENT_LOG whose payload starts with
+        LH2_CALIB_TAG; callers consume it via watch_log_events().
+        """
+        ...
+
     def watch_status(
         self, interval: float = 0.5
     ) -> Iterator[dict[str, NodeStatus]]: ...
