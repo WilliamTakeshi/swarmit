@@ -104,6 +104,12 @@ typedef struct {
 
 static const gpio_t _status_led = { .port = 1, .pin = 5 };  // TODO: use board specific values
 
+// Mari TX configs used by this bootloader. MARI_TX_INTERNAL is exported
+// from models.h for mari's own metrics-probe sends.
+static const mari_tx_config_t SWARMIT_TX_DEFAULT = {
+    .next_proto = MARI_NEXT_PROTO_SWARMIT_TESTBED,
+};
+
 static bootloader_app_data_t _bootloader_vars = { 0 };
 static swarmit_data_t _swarmit_vars = { 0 };
 extern schedule_t schedule_minuscule, schedule_tiny, schedule_small, schedule_huge, schedule_only_beacons, schedule_only_beacons_optimized_scan;
@@ -260,7 +266,7 @@ int main(void) {
             position_2d_t position = { 0 };
             memcpy(&_bootloader_vars.notification_buffer[length], (void *)&position, sizeof(position_2d_t));
             length += sizeof(position_2d_t);
-            mari_node_tx_payload(_bootloader_vars.notification_buffer, length);
+            mari_node_tx_payload(_bootloader_vars.notification_buffer, length, &SWARMIT_TX_DEFAULT);
         }
 
         if (_bootloader_vars.req_received) {
@@ -349,7 +355,7 @@ int main(void) {
             metrics_payload->rssi_at_node         = mr_radio_rssi();
 
             // send metrics probe to gateway
-            mari_node_tx_payload((uint8_t *)metrics_payload, sizeof(mr_metrics_payload_t));
+            mari_node_tx_payload((uint8_t *)metrics_payload, sizeof(mr_metrics_payload_t), &MARI_TX_INTERNAL);
         }
 
         if (_bootloader_vars.log_received) {
@@ -362,7 +368,7 @@ int main(void) {
             length += sizeof(uint32_t);
             memcpy(_bootloader_vars.notification_buffer + length, (void *)&_swarmit_vars.log, _swarmit_vars.log.length + 1);
             length += _swarmit_vars.log.length + 1;
-            mari_node_tx_payload(_bootloader_vars.notification_buffer, length);
+            mari_node_tx_payload(_bootloader_vars.notification_buffer, length, &SWARMIT_TX_DEFAULT);
         }
 
         if (_bootloader_vars.ota_start_request) {
@@ -385,7 +391,7 @@ int main(void) {
             size_t length = 0;
             _bootloader_vars.notification_buffer[length++] = SWRMT_MSG_OTA_START_ACK;
             while (!mari_node_is_connected()) {}
-            mari_node_tx_payload(_bootloader_vars.notification_buffer, length);
+            mari_node_tx_payload(_bootloader_vars.notification_buffer, length, &SWARMIT_TX_DEFAULT);
         }
 
         if (_bootloader_vars.ota_chunk_request) {
@@ -406,7 +412,7 @@ int main(void) {
             length += sizeof(uint32_t);
             _swarmit_vars.ota.last_chunk_acked = _swarmit_vars.ota.chunk_index;
             while (!mari_node_is_connected()) {}
-            mari_node_tx_payload(_bootloader_vars.notification_buffer, length);
+            mari_node_tx_payload(_bootloader_vars.notification_buffer, length, &SWARMIT_TX_DEFAULT);
 
             // If last chunk, finalize computed hash, set back to ready state
             if (_swarmit_vars.ota.chunk_index == _swarmit_vars.ota.chunk_count - 1) {

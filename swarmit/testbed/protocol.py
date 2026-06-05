@@ -53,9 +53,18 @@ class PayloadType(IntEnum):
 
     # SwarmIT calibration data
     SWARMIT_LH2_CALIBRATION = 0xA1
+    # Host -> node: trigger a raw LH2 capture (READY mode only)
+    SWARMIT_LH2_CAPTURE = 0xA2
 
     # Marilib metrics probe
     METRICS_PROBE = MariDefaultPayloadType.METRICS_PROBE
+
+
+# First byte of a raw LH2 capture sample carried inside a SWARMIT_EVENT_LOG
+# payload. Mirrors SWRMT_LH2_CALIB_TAG in the swarmit bootloader firmware; lets
+# the host tell a calibration sample apart from a regular text log line. Each
+# sample that follows is [lh_index:1][count1:4 LE][count2:4 LE].
+LH2_CALIB_TAG = 0xCA
 
 
 # Requests
@@ -96,6 +105,11 @@ class PayloadEmpty(Payload):
 @dataclass
 class PayloadStart(PayloadEmpty):
     """Dataclass that holds an application start request packet."""
+
+
+@dataclass
+class PayloadLH2Capture(PayloadEmpty):
+    """Dataclass that holds a raw LH2 capture trigger (no body)."""
 
 
 @dataclass
@@ -251,4 +265,5 @@ register_parser(PayloadType.SWARMIT_OTA_CHUNK_ACK, PayloadOTAChunkAck)
 register_parser(PayloadType.SWARMIT_EVENT_LOG, PayloadEvent)
 register_parser(PayloadType.SWARMIT_MESSAGE, PayloadMessage)
 register_parser(PayloadType.SWARMIT_LH2_CALIBRATION, PayloadCalibrationData)
+register_parser(PayloadType.SWARMIT_LH2_CAPTURE, PayloadLH2Capture)
 register_parser(PayloadType.METRICS_PROBE, MetricsProbePayload)

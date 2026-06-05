@@ -5,7 +5,12 @@ import threading
 import time
 
 from dotbot_utils.protocol import Packet
-from marilib.mari_protocol import MARI_BROADCAST_ADDRESS, Frame, Header
+from marilib.mari_protocol import (
+    MARI_BROADCAST_ADDRESS,
+    Frame,
+    Header,
+    NextProto,
+)
 from marilib.model import EdgeEvent, NodeInfoCloud
 from marilib.protocol import PacketType
 
@@ -179,7 +184,10 @@ class SwarmitNode(threading.Thread):
             EdgeEvent.to_bytes(EdgeEvent.NODE_DATA)
             + Frame(
                 header=Header(
-                    destination=0, source=self.address, type_=PacketType.DATA
+                    destination=0,
+                    source=self.address,
+                    type_=PacketType.DATA,
+                    next_proto=NextProto.SWARMIT_TESTBED,
                 ),
                 payload=packet.to_bytes(),
             ).to_bytes()

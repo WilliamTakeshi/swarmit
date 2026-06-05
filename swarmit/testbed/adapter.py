@@ -12,6 +12,7 @@ from dotbot_utils.protocol import (
 from marilib.communication_adapter import MQTTAdapter as MarilibMQTTAdapter
 from marilib.communication_adapter import SerialAdapter as MarilibSerialAdapter
 from marilib.mari_protocol import Frame as MariFrame
+from marilib.mari_protocol import NextProto
 from marilib.marilib_cloud import MarilibCloud
 from marilib.marilib_edge import MarilibEdge
 from marilib.model import EdgeEvent, MariNode
@@ -45,6 +46,13 @@ class MarilibEdgeAdapter(GatewayAdapterBase):
             if self.verbose:
                 print("[orange]Node left:[/]", event_data)
         elif event == EdgeEvent.NODE_DATA:
+            if event_data.header.next_proto != NextProto.SWARMIT_TESTBED:
+                if self.verbose:
+                    print(
+                        "[red]swarmit: dropping NODE_DATA frame with "
+                        f"unexpected next_proto {event_data.header.next_proto!r}[/]"
+                    )
+                return
             try:
                 packet = Packet.from_bytes(event_data.payload)
             except (ValueError, ProtocolPayloadParserException) as exc:
@@ -95,6 +103,7 @@ class MarilibEdgeAdapter(GatewayAdapterBase):
         self.mari.send_frame(
             dst=destination,
             payload=Packet.from_payload(payload).to_bytes(),
+            next_proto=NextProto.SWARMIT_TESTBED,
         )
 
 
@@ -109,6 +118,13 @@ class MarilibCloudAdapter(GatewayAdapterBase):
             if self.verbose:
                 print("[orange]Node left:[/]", event_data)
         elif event == EdgeEvent.NODE_DATA:
+            if event_data.header.next_proto != NextProto.SWARMIT_TESTBED:
+                if self.verbose:
+                    print(
+                        "[red]swarmit: dropping NODE_DATA frame with "
+                        f"unexpected next_proto {event_data.header.next_proto!r}[/]"
+                    )
+                return
             try:
                 packet = Packet.from_bytes(event_data.payload)
             except (ValueError, ProtocolPayloadParserException) as exc:
@@ -127,13 +143,25 @@ class MarilibCloudAdapter(GatewayAdapterBase):
         network_id: int,
         verbose: bool = False,
         busy_wait_timeout: float = 3,
+        username: str | None = None,
+        password: str | None = None,
     ):
         self.verbose = verbose
         self.busy_wait_timeout = busy_wait_timeout
+        # Broker credentials (from DOTBOT_MQTT_USER / DOTBOT_MQTT_PASS) take
+        # effect once the marilib companion adds username/password to
+        # MQTTAdapter; until then anonymous connect (unchanged behaviour).
+        mqtt_kwargs = {}
+        if username is not None:
+            mqtt_kwargs["username"] = username
+        if password is not None:
+            mqtt_kwargs["password"] = password
         try:
             self.mari = MarilibCloud(
                 self.on_event,
-                MarilibMQTTAdapter(host, port, use_tls=use_tls, is_edge=False),
+                MarilibMQTTAdapter(
+                    host, port, use_tls=use_tls, is_edge=False, **mqtt_kwargs
+                ),
                 network_id,
             )
         except Exception as exc:
@@ -161,4 +189,5 @@ class MarilibCloudAdapter(GatewayAdapterBase):
         self.mari.send_frame(
             dst=destination,
             payload=Packet.from_payload(payload).to_bytes(),
+            next_proto=NextProto.SWARMIT_TESTBED,
         )
